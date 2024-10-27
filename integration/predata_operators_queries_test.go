@@ -1,0 +1,273 @@
+package integration
+
+import (
+	"github.com/cloudberrydb/cbcopy/options"
+	"github.com/greenplum-db/gp-common-go-libs/structmatcher"
+
+	// "github.com/greenplum-db/gp-common-go-libs/testhelper"
+	"github.com/cloudberrydb/cbcopy/internal/testhelper"
+
+	// "github.com/greenplum-db/gpbackup/backup"
+	"github.com/cloudberrydb/cbcopy/meta/builtin"
+
+	//"github.com/greenplum-db/gpbackup/options"
+
+	// "github.com/greenplum-db/gpbackup/testutils"
+	"github.com/cloudberrydb/cbcopy/testutils"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+)
+
+var _ = Describe("cbcopy integration tests", func() {
+	Describe("GetOperators", func() {
+		/*
+			It("returns a slice of operators", func() {
+				testhelper.AssertQueryRuns(connectionPool, "CREATE OPERATOR public.## (LEFTARG = bigint, PROCEDURE = numeric_fac)")
+				defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR public.## (bigint, NONE)")
+
+				expectedOperator := builtin.Operator{Oid: 0, Schema: "public", Name: "##", Procedure: "numeric_fac", LeftArgType: "bigint", RightArgType: "-", CommutatorOp: "0", NegatorOp: "0", RestrictFunction: "-", JoinFunction: "-", CanHash: false, CanMerge: false}
+
+				results := builtin.GetOperators(connectionPool)
+
+				Expect(results).To(HaveLen(1))
+				structmatcher.ExpectStructsToMatchExcluding(&expectedOperator, &results[0], "Oid")
+			})
+		*/
+		It("returns a slice of operators with a full-featured operator", func() {
+			testhelper.AssertQueryRuns(connectionPool, "CREATE SCHEMA testschema")
+			defer testhelper.AssertQueryRuns(connectionPool, "DROP SCHEMA testschema")
+
+			testhelper.AssertQueryRuns(connectionPool, `CREATE FUNCTION testschema."testFunc"(path,path) RETURNS BOOLEAN AS 'SELECT true' LANGUAGE SQL IMMUTABLE`)
+			defer testhelper.AssertQueryRuns(connectionPool, `DROP FUNCTION testschema."testFunc"(path,path)`)
+
+			testhelper.AssertQueryRuns(connectionPool, `
+			CREATE OPERATOR testschema.## (
+				LEFTARG = path,
+				RIGHTARG = path,
+				PROCEDURE = testschema."testFunc",
+				COMMUTATOR = OPERATOR(testschema.##),
+				NEGATOR = OPERATOR(public.###),
+				RESTRICT = eqsel,
+				JOIN = eqjoinsel,
+				HASHES,
+				MERGES
+			)`)
+			defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR testschema.## (path, path)")
+			defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR public.### (path, path)")
+
+			version4expectedOperator := builtin.Operator{Oid: 0, Schema: "testschema", Name: "##", Procedure: `testschema."testFunc"`, LeftArgType: "path", RightArgType: "path", CommutatorOp: "testschema.##", NegatorOp: "public.###", RestrictFunction: "eqsel", JoinFunction: "eqjoinsel", CanHash: true, CanMerge: false}
+			expectedOperator := builtin.Operator{Oid: 0, Schema: "testschema", Name: "##", Procedure: `testschema."testFunc"`, LeftArgType: "path", RightArgType: "path", CommutatorOp: "testschema.##", NegatorOp: "public.###", RestrictFunction: "eqsel", JoinFunction: "eqjoinsel", CanHash: true, CanMerge: true}
+
+			results := builtin.GetOperators(connectionPool)
+
+			Expect(results).To(HaveLen(1))
+			if connectionPool.Version.Before("5") {
+				structmatcher.ExpectStructsToMatchExcluding(&version4expectedOperator, &results[0], "Oid")
+			} else {
+				structmatcher.ExpectStructsToMatchExcluding(&expectedOperator, &results[0], "Oid")
+			}
+		})
+		/* comment out, due to CBDB/PG14 - GP7/PG12 behavior diff
+		It("returns a slice of operators from a specific schema", func() {
+			testhelper.AssertQueryRuns(connectionPool, "CREATE OPERATOR public.## (LEFTARG = bigint, PROCEDURE = numeric_fac)")
+			defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR public.## (bigint, NONE)")
+			testhelper.AssertQueryRuns(connectionPool, "CREATE SCHEMA testschema")
+			defer testhelper.AssertQueryRuns(connectionPool, "DROP SCHEMA testschema")
+			testhelper.AssertQueryRuns(connectionPool, "CREATE OPERATOR testschema.## (LEFTARG = bigint, PROCEDURE = numeric_fac)")
+			defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR testschema.## (bigint, NONE)")
+
+			//_ = backupCmdFlags.Set(options.INCLUDE_SCHEMA, "testschema")
+			builtin.SetSchemaFilter(options.SCHEMA, "testschema")
+
+			expectedOperator := builtin.Operator{Oid: 0, Schema: "testschema", Name: "##", Procedure: "numeric_fac", LeftArgType: "bigint", RightArgType: "-", CommutatorOp: "0", NegatorOp: "0", RestrictFunction: "-", JoinFunction: "-", CanHash: false, CanMerge: false}
+
+			results := builtin.GetOperators(connectionPool)
+
+			Expect(results).To(HaveLen(1))
+			structmatcher.ExpectStructsToMatchExcluding(&expectedOperator, &results[0], "Oid")
+		})
+		*/
+	})
+	Describe("GetOperatorFamilies", func() {
+		BeforeEach(func() {
+			testutils.SkipIfBefore5(connectionPool)
+		})
+		It("returns a slice of operator families", func() {
+			testhelper.AssertQueryRuns(connectionPool, "CREATE OPERATOR FAMILY public.testfam USING hash;")
+			defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR FAMILY public.testfam USING hash")
+
+			expectedOperator := builtin.OperatorFamily{Oid: 0, Schema: "public", Name: "testfam", IndexMethod: "hash"}
+
+			results := builtin.GetOperatorFamilies(connectionPool)
+
+			Expect(results).To(HaveLen(1))
+			structmatcher.ExpectStructsToMatchExcluding(&expectedOperator, &results[0], "Oid")
+		})
+		/*		*/
+		It("returns a slice of operator families in a specific schema", func() {
+			testhelper.AssertQueryRuns(connectionPool, "CREATE OPERATOR FAMILY public.testfam USING hash;")
+			defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR FAMILY public.testfam USING hash")
+			testhelper.AssertQueryRuns(connectionPool, "CREATE SCHEMA testschema")
+			defer testhelper.AssertQueryRuns(connectionPool, "DROP SCHEMA testschema")
+			testhelper.AssertQueryRuns(connectionPool, "CREATE OPERATOR FAMILY testschema.testfam USING hash;")
+			defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR FAMILY testschema.testfam USING hash")
+
+			//_ = backupCmdFlags.Set(options.INCLUDE_SCHEMA, "testschema")
+			builtin.SetSchemaFilter(options.SCHEMA, "testschema")
+
+			expectedOperator := builtin.OperatorFamily{Oid: 0, Schema: "testschema", Name: "testfam", IndexMethod: "hash"}
+
+			results := builtin.GetOperatorFamilies(connectionPool)
+
+			Expect(results).To(HaveLen(1))
+			structmatcher.ExpectStructsToMatchExcluding(&expectedOperator, &results[0], "Oid")
+		})
+
+	})
+	Describe("GetOperatorClasses", func() {
+		It("returns a slice of operator classes", func() {
+			testhelper.AssertQueryRuns(connectionPool, "CREATE OPERATOR CLASS public.testclass FOR TYPE int USING hash AS STORAGE int")
+			if connectionPool.Version.Before("5") {
+				defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR CLASS public.testclass USING hash")
+			} else {
+				defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR FAMILY public.testclass USING hash")
+			}
+
+			version4expected := builtin.OperatorClass{Oid: 0, Schema: "public", Name: "testclass", FamilySchema: "", FamilyName: "", IndexMethod: "hash", Type: "integer", Default: false, StorageType: "-", Operators: nil, Functions: nil}
+			expected := builtin.OperatorClass{Oid: 0, Schema: "public", Name: "testclass", FamilySchema: "public", FamilyName: "testclass", IndexMethod: "hash", Type: "integer", Default: false, StorageType: "-", Operators: nil, Functions: nil}
+
+			results := builtin.GetOperatorClasses(connectionPool)
+
+			Expect(results).To(HaveLen(1))
+			if connectionPool.Version.Before("5") {
+				structmatcher.ExpectStructsToMatchExcluding(&version4expected, &results[0], "Oid")
+			} else {
+				structmatcher.ExpectStructsToMatchExcluding(&expected, &results[0], "Oid")
+			}
+		})
+		It("returns a slice of operator classes with an operator family", func() {
+			testutils.SkipIfBefore5(connectionPool)
+			testhelper.AssertQueryRuns(connectionPool, "CREATE SCHEMA testschema")
+			defer testhelper.AssertQueryRuns(connectionPool, "DROP SCHEMA testschema CASCADE")
+
+			testhelper.AssertQueryRuns(connectionPool, "CREATE OPERATOR FAMILY testschema.testfam USING gist;")
+			defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR FAMILY testschema.testfam USING gist CASCADE")
+			testhelper.AssertQueryRuns(connectionPool, "CREATE OPERATOR CLASS public.testclass FOR TYPE int USING gist FAMILY testschema.testfam AS STORAGE int")
+
+			expected := builtin.OperatorClass{Oid: 0, Schema: "public", Name: "testclass", FamilySchema: "testschema", FamilyName: "testfam", IndexMethod: "gist", Type: "integer", Default: false, StorageType: "-", Operators: nil, Functions: nil}
+
+			results := builtin.GetOperatorClasses(connectionPool)
+
+			Expect(results).To(HaveLen(1))
+			structmatcher.ExpectStructsToMatchExcluding(&expected, &results[0], "Oid")
+		})
+		It("returns a slice of operator classes with different type and storage type", func() {
+			testhelper.AssertQueryRuns(connectionPool, "CREATE OPERATOR CLASS public.testclass DEFAULT FOR TYPE int USING gist AS STORAGE text")
+			if connectionPool.Version.Before("5") {
+				defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR CLASS public.testclass USING gist")
+			} else {
+				defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR FAMILY public.testclass USING gist")
+			}
+
+			version4expected := builtin.OperatorClass{Oid: 0, Schema: "public", Name: "testclass", FamilySchema: "", FamilyName: "", IndexMethod: "gist", Type: "integer", Default: true, StorageType: "text", Operators: nil, Functions: nil}
+			expected := builtin.OperatorClass{Oid: 0, Schema: "public", Name: "testclass", FamilySchema: "public", FamilyName: "testclass", IndexMethod: "gist", Type: "integer", Default: true, StorageType: "text", Operators: nil, Functions: nil}
+
+			results := builtin.GetOperatorClasses(connectionPool)
+
+			Expect(results).To(HaveLen(1))
+			if connectionPool.Version.Before("5") {
+				structmatcher.ExpectStructsToMatchExcluding(&version4expected, &results[0], "Oid")
+			} else {
+				structmatcher.ExpectStructsToMatchExcluding(&expected, &results[0], "Oid")
+			}
+		})
+		/* comment out, due to CBDB/PG14 - GP7/PG12 behavior diff
+		It("returns a slice of operator classes with operators and functions", func() {
+			opClassQuery := ""
+			expectedRecheck := false
+			if connectionPool.Version.Before("6") {
+				opClassQuery = "CREATE OPERATOR CLASS public.testclass FOR TYPE int USING gist AS OPERATOR 1 = RECHECK, OPERATOR 2 < , FUNCTION 1 abs(integer), FUNCTION 2 int4out(integer)"
+				expectedRecheck = true
+			} else {
+				opClassQuery = "CREATE OPERATOR CLASS public.testclass FOR TYPE int USING gist AS OPERATOR 1 =, OPERATOR 2 < , FUNCTION 1 abs(integer), FUNCTION 2 int4out(integer)"
+			}
+
+			testhelper.AssertQueryRuns(connectionPool, opClassQuery)
+
+			if connectionPool.Version.Before("5") {
+				defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR CLASS public.testclass USING gist")
+			} else {
+				defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR FAMILY public.testclass USING gist")
+			}
+
+			expectedOperators := []builtin.OperatorClassOperator{{ClassOid: 0, StrategyNumber: 1, Operator: "=(integer,integer)", Recheck: expectedRecheck}, {ClassOid: 0, StrategyNumber: 2, Operator: "<(integer,integer)", Recheck: false}}
+			expected4Functions := []builtin.OperatorClassFunction{{ClassOid: 0, SupportNumber: 1, FunctionName: "abs(integer)"}, {ClassOid: 0, SupportNumber: 2, FunctionName: "int4out(integer)"}}
+			expectedFunctions := []builtin.OperatorClassFunction{{ClassOid: 0, SupportNumber: 1, LeftType: "integer", RightType: "integer", FunctionName: "abs(integer)"}, {ClassOid: 0, SupportNumber: 2, LeftType: "integer", RightType: "integer", FunctionName: "int4out(integer)"}}
+			version4expected := builtin.OperatorClass{Oid: 0, Schema: "public", Name: "testclass", FamilySchema: "", FamilyName: "", IndexMethod: "gist", Type: "integer", Default: false, StorageType: "-", Operators: expectedOperators, Functions: expected4Functions}
+			expected := builtin.OperatorClass{Oid: 0, Schema: "public", Name: "testclass", FamilySchema: "public", FamilyName: "testclass", IndexMethod: "gist", Type: "integer", Default: false, StorageType: "-", Operators: expectedOperators, Functions: expectedFunctions}
+
+			results := builtin.GetOperatorClasses(connectionPool)
+
+			Expect(results).To(HaveLen(1))
+			if connectionPool.Version.Before("5") {
+				structmatcher.ExpectStructsToMatchExcluding(&version4expected, &results[0], "Oid", "Operators.ClassOid", "Functions.ClassOid")
+			} else {
+				structmatcher.ExpectStructsToMatchExcluding(&expected, &results[0], "Oid", "Operators.ClassOid", "Functions.ClassOid")
+			}
+		})
+
+		*/
+		It("returns a slice of operator classes for a specific schema", func() {
+			testhelper.AssertQueryRuns(connectionPool, "CREATE OPERATOR CLASS public.testclass FOR TYPE int USING hash AS STORAGE int")
+			if connectionPool.Version.Before("5") {
+				defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR CLASS public.testclass USING hash")
+			} else {
+				defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR FAMILY public.testclass USING hash")
+			}
+			testhelper.AssertQueryRuns(connectionPool, "CREATE SCHEMA testschema")
+			defer testhelper.AssertQueryRuns(connectionPool, "DROP SCHEMA testschema CASCADE")
+			testhelper.AssertQueryRuns(connectionPool, "CREATE OPERATOR CLASS testschema.testclass FOR TYPE int USING hash AS STORAGE int")
+			if connectionPool.Version.Before("5") {
+				defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR CLASS testschema.testclass USING hash")
+			} else {
+				defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR FAMILY testschema.testclass USING hash")
+			}
+
+			//_ = backupCmdFlags.Set(options.INCLUDE_SCHEMA, "testschema")
+			builtin.SetSchemaFilter(options.SCHEMA, "testschema")
+
+			version4expected := builtin.OperatorClass{Oid: 0, Schema: "testschema", Name: "testclass", FamilySchema: "", FamilyName: "", IndexMethod: "hash", Type: "integer", Default: false, StorageType: "-", Operators: nil, Functions: nil}
+			expected := builtin.OperatorClass{Oid: 0, Schema: "testschema", Name: "testclass", FamilySchema: "testschema", FamilyName: "testclass", IndexMethod: "hash", Type: "integer", Default: false, StorageType: "-", Operators: nil, Functions: nil}
+
+			results := builtin.GetOperatorClasses(connectionPool)
+
+			Expect(results).To(HaveLen(1))
+			if connectionPool.Version.Before("5") {
+				structmatcher.ExpectStructsToMatchExcluding(&version4expected, &results[0], "Oid")
+			} else {
+				structmatcher.ExpectStructsToMatchExcluding(&expected, &results[0], "Oid")
+			}
+		})
+		/* comment out, due to CBDB/PG14 - GP7/PG12 behavior diff
+		It("returns a slice of operator classes with an operator with a sort family", func() {
+			testutils.SkipIfBefore6(connectionPool)
+
+			testhelper.AssertQueryRuns(connectionPool, "CREATE OPERATOR FAMILY public.sort_family USING btree")
+			defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR FAMILY public.sort_family USING btree")
+			opClassQuery := "CREATE OPERATOR CLASS public.testclass FOR TYPE int USING gist AS OPERATOR 1 = FOR ORDER BY public.sort_family"
+			testhelper.AssertQueryRuns(connectionPool, opClassQuery)
+			defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR FAMILY public.testclass USING gist")
+
+			expectedOperators := []builtin.OperatorClassOperator{{ClassOid: 0, StrategyNumber: 1, Operator: "=(integer,integer)", Recheck: false, OrderByFamily: "public.sort_family"}}
+			expected := builtin.OperatorClass{Oid: 0, Schema: "public", Name: "testclass", FamilySchema: "public", FamilyName: "testclass", IndexMethod: "gist", Type: "integer", Default: false, StorageType: "-", Operators: expectedOperators, Functions: nil}
+
+			results := builtin.GetOperatorClasses(connectionPool)
+
+			Expect(results).To(HaveLen(1))
+			structmatcher.ExpectStructsToMatchExcluding(&expected, &results[0], "Oid", "Operators.ClassOid", "Functions.ClassOid")
+		})
+
+		*/
+	})
+})

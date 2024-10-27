@@ -1,0 +1,1 @@
+drop table public.tb_partition;
