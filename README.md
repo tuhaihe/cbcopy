@@ -5,8 +5,7 @@ cbcopy is designed to migrate Greenplum Database clusters, including both metada
 ## How does cbcopy work?
 
 ### Metadata migration
-The metadata migration feature of cbcopy is derived from gpbackup and gprestore. Its main advantage over the built-in pg\_dump of GPDB is that it uses batch retrieval of metadata, rather than fetching metadata one row at a time like pg\_dump. This results in a significant performance advantage when migrating metadata in scenarios where the volume of metadata in the source database is large compared to pg_dump.
-
+The metadata migration feature of cbcopy is based on gpbackup and gprestore. Its primary advantage over the built-in pg_dump of GPDB lies in its use of batch retrieval for metadata. Unlike pg_dump, which fetches metadata one row at a time, cbcopy retrieves it in batches. This approach significantly enhances performance, particularly when migrating large volumes of metadata from the source database compared to pg_dump.
 ### Data migration
 
 Both GPDB and CBDB support starting programs via SQL commands, and cbcopy utilizes this feature. During data migration, it uses SQL commands to start a program on the target database to receive and load data, while simultaneously using SQL commands to start a program on the source database to unload data and send it to the program on the target database.
@@ -97,6 +96,15 @@ cbcopy internally supports three copy strategies for tables.
 
 - `Copy On Segment` - If the table's statistics pg_class->reltuples is greater than --on-segment-threshold, and both the source and target databases have the same version and the same number of nodes, cbcopy will enable the Copy On Segment strategy for this table. This means that data migration between the source and target databases will occur in parallel across all segment nodes without data redistribution.
 - `Copy on External Table` - For tables that do not meet the conditions for the above two strategies, cbcopy will enable the Copy On External Table strategy. This means that data migration between the source and target databases will occur in parallel across all segment nodes with data redistribution.
+
+### Result files
+After the cbcopy finishes running, it generates some files in the $USER/gpAdminLogs directory. The cbcopy_$timestamp.log file contains all the logs, including debugging and error messages. Additionally, there will be cbcopy_succeed_$timestamp and cbcopy_failed_$timestamp files, which contain the tables that were processed successfully and those that failed.
+
+### Multiple migrations
+If, after migration, some tables migrate successfully while others fail, we can pass the cbcopy_succeed_$timestamp file to the --exclude-table-file option. This way, we can avoid re-migrating the tables that have already been successfully migrated.
+
+### Statistics Used by the cbcopy
+When migrating in a production environment, a good strategy is to perform an analyze command on tables with a large amount of data in advance. cbcopy will use statistics of the table to decide whether to migrate only through the master or through all the segment nodes
 
 ## Examples
 ```
