@@ -48,6 +48,13 @@ Runs the unit tests
 
 Before migrating data, you need to copy cbcopy_helper to the $GPHOME/bin directory on all nodes of both the source and target databases. Then you need to find a host that can connect to both the source database and the target database, and use the cbcopy command on that host to initiate the migration.By default, both metadata and data are migrated.
 
+### Database version requirements
+cbcopy relies on the "COPY ON SEGMENT" command of the database, so it has specific version requirements for the database.
+
+- `GPDB 4.x` - A minimum of GPDB version 4.3.17 or higher is required. If your version does not meet this requirement, you can upgrade to GPDB 4.3.17.
+- `GPDB 5.x` - cbcopy is compatible with all versions of GPDB 5.x.
+- `GPDB 6.x` - cbcopy is compatible with all versions of GPDB 6.x.
+- `CBDB 1.x` - cbcopy is compatible with all versions of CBDB 1.x.
 
 ### Migration Modes
 
@@ -60,7 +67,6 @@ cbcopy supports seven migration modes.
 - `--include-table` - Migrate specific tables or multiple tables from the source database to the target database.
 - `--include-table-file` - Migrate specific tables specified in a file from the source database to the target database.
 - `--global-metadata-only` - Migrate global objects from the source database to the target database.
-
 
 ### Data Loading Modes
 cbcopy supports two data loading modes.
