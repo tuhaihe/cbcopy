@@ -31,7 +31,6 @@ var _ = Describe("cbcopy integration tests", func() {
 
 			schemaBar := builtin.Schema{Oid: 0, Name: "bar"}
 			schemaPublic := builtin.Schema{Oid: 2200, Name: "public"}
-
 			Expect(schemas).To(HaveLen(2))
 			structmatcher.ExpectStructsToMatchExcluding(&schemaBar, &schemas[0], "Oid")
 			structmatcher.ExpectStructsToMatchExcluding(&schemaPublic, &schemas[1], "Owner")

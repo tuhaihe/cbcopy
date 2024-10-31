@@ -155,7 +155,14 @@ var _ = Describe("cbcopy integration tests", func() {
 			defer testhelper.AssertQueryRuns(connectionPool, "DROP OPERATOR FAMILY testschema.testfam USING gist CASCADE")
 			testhelper.AssertQueryRuns(connectionPool, "CREATE OPERATOR CLASS public.testclass FOR TYPE int USING gist FAMILY testschema.testfam AS STORAGE int")
 
-			expected := builtin.OperatorClass{Oid: 0, Schema: "public", Name: "testclass", FamilySchema: "testschema", FamilyName: "testfam", IndexMethod: "gist", Type: "integer", Default: false, StorageType: "-", Operators: nil, Functions: nil}
+			var storageType string
+			if connectionPool.Version.Before("7") {
+				storageType = "-"
+			} else {
+				storageType = "integer"
+			}
+
+			expected := builtin.OperatorClass{Oid: 0, Schema: "public", Name: "testclass", FamilySchema: "testschema", FamilyName: "testfam", IndexMethod: "gist", Type: "integer", Default: false, StorageType: storageType, Operators: nil, Functions: nil}
 
 			results := builtin.GetOperatorClasses(connectionPool)
 

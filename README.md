@@ -38,11 +38,35 @@ make install
 This will install the cbcopy and cbcopy_helper programs binaries the $GPHOME/bin directory. Note that GPDB must be sourced for this to work.
 
 ## Test
+### Test setup
+Some integration tests depend on the dummy_seclabel extension in the Database. Therefore, you need to install the dummy_seclabel extension in the Database first. This extension exists only to support testing of the SECURITY LABEL statement and is not intended for use in production. After successfully installing the dummy_seclabel extension, use the following commands to enable it.
+```bash
+# Configure the shared_preload_libraries parameter to include the dummy_seclabel extension
+gpconfig -c shared_preload_libraries -v dummy_seclabel
+# Restart the Greenplum database to apply the changes
+gpstop -ra
+# Verify that the dummy_seclabel extension has been successfully added to shared_preload_libraries
+gpconfig -s shared_preload_libraries | grep dummy_seclabel
+```
+
+### Running tests
+To run all tests except end-to-end (unit, and integration), use
 ```bash
 make test
 ```
-Runs the unit tests
+To run only unit tests, use
+```bash
+make unit
+```
+Running integration tests requires a database instance with the gpcloud extension installed, and the database must be configured with the --with-perl option
 
+```bash
+make integration
+```
+To run end to end tests (requires a running GPDB instance), use
+```bash
+make end_to_end
+```
 
 ## Migrating Data with cbcopy
 

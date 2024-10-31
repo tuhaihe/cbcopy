@@ -881,7 +881,12 @@ LANGUAGE SQL`)
 
 			results := builtin.GetExtensions(connectionPool)
 
-			Expect(results).To(HaveLen(1))
+			if connectionPool.Version.Before("7") {
+				Expect(results).To(HaveLen(1))
+			} else {
+				// gp_toolkit is installed by default as an extension in GPDB7+
+				Expect(results).To(HaveLen(2))
+			}
 
 			plperlDef := builtin.Extension{Oid: 0, Name: "plperl", Schema: "pg_catalog"}
 			structmatcher.ExpectStructsToMatchExcluding(&plperlDef, &results[0], "Oid")

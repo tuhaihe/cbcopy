@@ -18,7 +18,7 @@ depend:
 	$(GO_ENV) go mod download
 
 $(GINKGO):
-	$(GO_ENV) go install github.com/onsi/ginkgo/v2/ginkgo@v2.8.4
+	$(GO_ENV) go install github.com/onsi/ginkgo/v2/ginkgo
 
 $(GOIMPORTS):
 	$(GO_ENV) go install golang.org/x/tools/cmd/goimports
@@ -28,17 +28,17 @@ format: $(GOIMPORTS)
 
 unit: $(GINKGO)
 	@echo "Running unit tests..."
-	$(GINKGO) $(GINKGO_FLAGS) $(SUBDIRS_HAS_UNIT) 2>&1
+	$(GINKGO) $(GINKGO_FLAGS) $(SUBDIRS_HAS_UNIT)
 
 integration: $(GINKGO)
 	@echo "Running integration tests..."
-	$(GINKGO) $(GINKGO_FLAGS) integration 2>&1
+	$(GINKGO) $(GINKGO_FLAGS) integration
 
-test: unit
+test: unit integration
 
 end_to_end: $(GINKGO)
 	@echo "Running end to end tests..."
-	$(GINKGO) $(GINKGO_FLAGS) end_to_end 2>&1
+	$(GINKGO) $(GINKGO_FLAGS) end_to_end
 
 build:
 	$(GO_ENV) go build -tags '$(CBCOPY)' $(GOFLAGS) -o $(CBCOPY) -ldflags $(VERSION_STR)

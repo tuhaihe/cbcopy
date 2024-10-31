@@ -1056,7 +1056,13 @@ AS $$ BEGIN RAISE EXCEPTION 'exception'; END; $$;`)
 				uniqueID := testutils.UniqueIDFromObjectName(connectionPool, "", "plperl", builtin.TYPE_EXTENSION)
 				resultMetadataMap := builtin.GetCommentsForObjectType(connectionPool, builtin.TYPE_EXTENSION)
 
-				Expect(resultMetadataMap).To(HaveLen(1))
+				if connectionPool.Version.Before("7") {
+					Expect(resultMetadataMap).To(HaveLen(1))
+				} else {
+					// gp_toolkit is installed by default as an extension in GPDB7+
+					Expect(resultMetadataMap).To(HaveLen(2))
+				}
+
 				resultMetadata := resultMetadataMap[uniqueID]
 				structmatcher.ExpectStructsToMatch(&extensionMetadata, &resultMetadata)
 			})

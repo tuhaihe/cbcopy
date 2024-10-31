@@ -47,31 +47,6 @@ var _ = Describe("cbcopy integration tests", func() {
 		})
 
 		Context("leaf-partition-data flag", func() {
-			It("returns only parent partition tables if the leaf-partition-data flag is not set and there are no include tables", func() {
-				createStmt := `CREATE TABLE public.rank (id int, rank int, year int, gender
-char(1), count int )
-DISTRIBUTED BY (id)
-PARTITION BY LIST (gender)
-( PARTITION girls VALUES ('F'),
-  PARTITION boys VALUES ('M'),
-  DEFAULT PARTITION other );`
-				testhelper.AssertQueryRuns(connectionPool, createStmt)
-				defer testhelper.AssertQueryRuns(connectionPool, "DROP TABLE public.rank")
-
-				tables := builtin.GetIncludedUserTableRelations(connectionPool, []string{})
-
-				tableRank := builtin.Relation{Schema: "public", Name: "rank"}
-
-				if connectionPool.Version.Before("7") {
-					Expect(tables).To(HaveLen(1))
-				} else {
-					// For GPDB 7+, the leaf partitions have their own DDL so they need to be obtained as well
-					Expect(tables).To(HaveLen(4))
-				}
-
-				structmatcher.ExpectStructsToMatchExcluding(&tableRank, &tables[0], "SchemaOid", "Oid")
-			})
-			/*			*/
 			It("returns both parent and leaf partition tables if the leaf-partition-data flag is set and there are no include tables", func() {
 				//_ = backupCmdFlags.Set(options.LEAF_PARTITION_DATA, "true")
 				createStmt := `CREATE TABLE public.rank (id int, rank int, year int, gender

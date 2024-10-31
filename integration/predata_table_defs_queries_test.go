@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/cloudberrydb/cbcopy/options"
-
 	"github.com/greenplum-db/gp-common-go-libs/structmatcher"
 	// "github.com/greenplum-db/gp-common-go-libs/testhelper"
 	"github.com/cloudberrydb/cbcopy/internal/testhelper"
@@ -99,7 +98,14 @@ PARTITION BY RANGE (year)
 			oid := testutils.OidFromObjectName(connectionPool, "public", "co_atttable", builtin.TYPE_RELATION)
 			tableAtts := builtin.GetColumnDefinitions(connectionPool)[oid]
 
-			columnA := builtin.ColumnDefinition{Oid: 0, Num: 1, Name: "a", NotNull: false, HasDefault: false, Type: "double precision", Encoding: "compresstype=none,blocksize=32768,compresslevel=0", StatTarget: -1, StorageType: "", DefaultVal: "", Comment: ""}
+			var encoding string
+			if connectionPool.Version.IsCBDB {
+				encoding = "compresstype=none,compresslevel=0,blocksize=32768"
+			} else {
+				encoding = "compresstype=none,blocksize=32768,compresslevel=0"
+			}
+
+			columnA := builtin.ColumnDefinition{Oid: 0, Num: 1, Name: "a", NotNull: false, HasDefault: false, Type: "double precision", Encoding: encoding, StatTarget: -1, StorageType: "", DefaultVal: "", Comment: ""}
 			columnB := builtin.ColumnDefinition{Oid: 0, Num: 2, Name: "b", NotNull: false, HasDefault: false, Type: "text", Encoding: "blocksize=65536,compresstype=none,compresslevel=0", StatTarget: -1, StorageType: "", DefaultVal: "", Comment: ""}
 
 			Expect(tableAtts).To(HaveLen(2))
@@ -403,14 +409,13 @@ PARTITION BY LIST (gender)
 			results, _ := builtin.GetPartitionDetails(connectionPool)
 			Expect(results).To(HaveLen(1))
 			result := results[oid]
-
 			// The spacing is very specific here and is output from the postgres function
 			expectedResult := fmt.Sprintf(`PARTITION BY LIST(gender) `+`
-			          (
-			          PARTITION girls VALUES('F') WITH (tablename='part_table_1_prt_girls', appendonly=%[1]s), `+`
-			          PARTITION boys VALUES('M') WITH (tablename='part_table_1_prt_boys', appendonly=%[1]s), `+`
-			          DEFAULT PARTITION other  WITH (tablename='part_table_1_prt_other', appendonly=%[1]s)
-			          )`, partitionPartFalseExpectation)
+          (
+          PARTITION girls VALUES('F') WITH (tablename='part_table_1_prt_girls', appendonly=%[1]s), `+`
+          PARTITION boys VALUES('M') WITH (tablename='part_table_1_prt_boys', appendonly=%[1]s), `+`
+          DEFAULT PARTITION other  WITH (tablename='part_table_1_prt_other', appendonly=%[1]s)
+          )`, partitionPartFalseExpectation)
 			Expect(result).To(Equal(expectedResult))
 		})
 
@@ -446,11 +451,11 @@ PARTITION BY LIST (gender)
 
 			// The spacing is very specific here and is output from the postgres function
 			expectedResult := fmt.Sprintf(`PARTITION BY LIST(gender) `+`
-			          (
-			          PARTITION girls VALUES('F') WITH (tablename='part_table_1_prt_girls', appendonly=%[1]s), `+`
-			          PARTITION boys VALUES('M') WITH (tablename='part_table_1_prt_boys', appendonly=%[1]s), `+`
-			          DEFAULT PARTITION other  WITH (tablename='part_table_1_prt_other', appendonly=%[1]s)
-			          )`, partitionPartFalseExpectation)
+          (
+          PARTITION girls VALUES('F') WITH (tablename='part_table_1_prt_girls', appendonly=%[1]s), `+`
+          PARTITION boys VALUES('M') WITH (tablename='part_table_1_prt_boys', appendonly=%[1]s), `+`
+          DEFAULT PARTITION other  WITH (tablename='part_table_1_prt_other', appendonly=%[1]s)
+          )`, partitionPartFalseExpectation)
 			Expect(result).To(Equal(expectedResult))
 		})
 
@@ -561,25 +566,25 @@ SET SUBPARTITION TEMPLATE
 			 */
 			expectedResult := ""
 			if connectionPool.Version.Before("6") {
-				expectedResult = `ALTER TABLE public.part_table
-			SET SUBPARTITION TEMPLATE
-			          (
-			          SUBPARTITION usa VALUES('usa') WITH (tablename='part_table'),
-			          SUBPARTITION asia VALUES('asia') WITH (tablename='part_table'),
-			          SUBPARTITION europe VALUES('europe') WITH (tablename='part_table'),
-			          DEFAULT SUBPARTITION other_regions  WITH (tablename='part_table')
-			          )
-			`
+				expectedResult = `ALTER TABLE public.part_table 
+SET SUBPARTITION TEMPLATE  
+          (
+          SUBPARTITION usa VALUES('usa') WITH (tablename='part_table'), 
+          SUBPARTITION asia VALUES('asia') WITH (tablename='part_table'), 
+          SUBPARTITION europe VALUES('europe') WITH (tablename='part_table'), 
+          DEFAULT SUBPARTITION other_regions  WITH (tablename='part_table')
+          )
+`
 			} else {
-				expectedResult = `ALTER TABLE public.part_table
-			SET SUBPARTITION TEMPLATE
-			          (
-			          SUBPARTITION usa VALUES('usa') WITH (tablename='part_table'),
-			          SUBPARTITION asia VALUES('asia') WITH (tablename='part_table'),
-			          SUBPARTITION europe VALUES('europe') WITH (tablename='part_table'),
-			          DEFAULT SUBPARTITION other_regions  WITH (tablename='part_table')
-			          )
-			`
+				expectedResult = `ALTER TABLE public.part_table 
+SET SUBPARTITION TEMPLATE 
+          (
+          SUBPARTITION usa VALUES('usa') WITH (tablename='part_table'), 
+          SUBPARTITION asia VALUES('asia') WITH (tablename='part_table'), 
+          SUBPARTITION europe VALUES('europe') WITH (tablename='part_table'), 
+          DEFAULT SUBPARTITION other_regions  WITH (tablename='part_table')
+          )
+`
 			}
 			Expect(result).To(Equal(expectedResult))
 
@@ -629,25 +634,25 @@ SET SUBPARTITION TEMPLATE
 			 */
 			expectedResult := ""
 			if connectionPool.Version.Before("6") {
-				expectedResult = `ALTER TABLE testschema.part_table
-			SET SUBPARTITION TEMPLATE
-			          (
-			          SUBPARTITION usa VALUES('usa') WITH (tablename='part_table'),
-			          SUBPARTITION asia VALUES('asia') WITH (tablename='part_table'),
-			          SUBPARTITION europe VALUES('europe') WITH (tablename='part_table'),
-			          DEFAULT SUBPARTITION other_regions  WITH (tablename='part_table')
-			          )
-			`
+				expectedResult = `ALTER TABLE testschema.part_table 
+SET SUBPARTITION TEMPLATE  
+          (
+          SUBPARTITION usa VALUES('usa') WITH (tablename='part_table'), 
+          SUBPARTITION asia VALUES('asia') WITH (tablename='part_table'), 
+          SUBPARTITION europe VALUES('europe') WITH (tablename='part_table'), 
+          DEFAULT SUBPARTITION other_regions  WITH (tablename='part_table')
+          )
+`
 			} else {
-				expectedResult = `ALTER TABLE testschema.part_table
-			SET SUBPARTITION TEMPLATE
-			          (
-			          SUBPARTITION usa VALUES('usa') WITH (tablename='part_table'),
-			          SUBPARTITION asia VALUES('asia') WITH (tablename='part_table'),
-			          SUBPARTITION europe VALUES('europe') WITH (tablename='part_table'),
-			          DEFAULT SUBPARTITION other_regions  WITH (tablename='part_table')
-			          )
-			`
+				expectedResult = `ALTER TABLE testschema.part_table 
+SET SUBPARTITION TEMPLATE 
+          (
+          SUBPARTITION usa VALUES('usa') WITH (tablename='part_table'), 
+          SUBPARTITION asia VALUES('asia') WITH (tablename='part_table'), 
+          SUBPARTITION europe VALUES('europe') WITH (tablename='part_table'), 
+          DEFAULT SUBPARTITION other_regions  WITH (tablename='part_table')
+          )
+`
 			}
 
 			Expect(result).To(Equal(expectedResult))

@@ -650,10 +650,23 @@ var _ = Describe("cbcopy integration create statement tests", func() {
 			resultExtensions := builtin.GetExtensions(connectionPool)
 			resultMetadataMap := builtin.GetCommentsForObjectType(connectionPool, builtin.TYPE_EXTENSION)
 			plperlExtension.Oid = testutils.OidFromObjectName(connectionPool, "", "plperl", builtin.TYPE_EXTENSION)
-			Expect(resultExtensions).To(HaveLen(1))
+
+			if connectionPool.Version.Before("7") {
+				Expect(resultExtensions).To(HaveLen(1))
+			} else {
+				// gp_toolkit is installed by default as an extension in GPDB7+
+				Expect(resultExtensions).To(HaveLen(2))
+			}
 			plperlMetadata := resultMetadataMap[plperlExtension.GetUniqueID()]
-			structmatcher.ExpectStructsToMatch(&plperlExtension, &resultExtensions[0])
 			structmatcher.ExpectStructsToMatch(&extensionMetadata, &plperlMetadata)
+			// We don't guarantee the order in which extensions are returned, so plperl could be in either struct
+			for _, result := range resultExtensions {
+				if result.Name == "plperl" {
+					structmatcher.ExpectStructsToMatch(&plperlExtension, &result)
+					return
+				}
+			}
+			Fail("PLPerl extension not found in list")
 		})
 	})
 	Describe("PrintCreateTransformStatements", func() {
