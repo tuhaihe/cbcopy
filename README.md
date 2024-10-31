@@ -5,7 +5,7 @@ cbcopy is designed to migrate Greenplum Database clusters, including both metada
 ## How does cbcopy work?
 
 ### Metadata migration
-The metadata migration feature of cbcopy is based on gpbackup and gprestore. Its primary advantage over the built-in pg_dump of GPDB lies in its use of batch retrieval for metadata. Unlike pg_dump, which fetches metadata one row at a time, cbcopy retrieves it in batches. This approach significantly enhances performance, particularly when migrating large volumes of metadata from the source database compared to pg_dump.
+The metadata migration feature of cbcopy is based on gpbackup and gprestore. Its primary advantage over the built-in `pg_dump` of GPDB lies in its use of batch retrieval for metadata. Unlike `pg_dump`, which fetches metadata one row at a time, cbcopy retrieves it in batches. This approach significantly enhances performance, particularly when migrating large volumes of metadata from the source database compared to `pg_dump`.
 ### Data migration
 
 Both GPDB and CBDB support starting programs via SQL commands, and cbcopy utilizes this feature. During data migration, it uses SQL commands to start a program on the target database to receive and load data, while simultaneously using SQL commands to start a program on the source database to unload data and send it to the program on the target database.
@@ -35,42 +35,47 @@ This will build the cbcopy and cbcopy_helper binaries in the source directory.
 ```bash
 make install
 ```
-This will install the cbcopy and cbcopy_helper programs binaries the $GPHOME/bin directory. Note that GPDB must be sourced for this to work.
+This will install the cbcopy and cbcopy_helper programs binaries the `$GPHOME/bin` directory. Note that GPDB must be sourced for this to work.
 
 ## Test
 ### Test setup
-Some integration tests depend on the dummy_seclabel extension in the Database. Therefore, you need to install the dummy_seclabel extension in the Database first. This extension exists only to support testing of the SECURITY LABEL statement and is not intended for use in production. After successfully installing the dummy_seclabel extension, use the following commands to enable it.
+Some integration tests depend on the `dummy_seclabel` extension in the Database. Therefore, you need to install the `dummy_seclabel` extension in the Database first. This extension exists only to support testing of the SECURITY LABEL statement and is not intended for use in production. After successfully installing the `dummy_seclabel` extension, use the following commands to enable it.
+
 ```bash
 # Configure the shared_preload_libraries parameter to include the dummy_seclabel extension
 gpconfig -c shared_preload_libraries -v dummy_seclabel
+
 # Restart the Greenplum database to apply the changes
 gpstop -ra
+
 # Verify that the dummy_seclabel extension has been successfully added to shared_preload_libraries
 gpconfig -s shared_preload_libraries | grep dummy_seclabel
 ```
 
 ### Running tests
-To run all tests except end-to-end (unit, and integration), use
+To run all tests except end-to-end (unit, and integration), use:
 ```bash
 make test
 ```
-To run only unit tests, use
+
+To run only unit tests, use:
 ```bash
 make unit
 ```
-Running integration tests requires a database instance with the gpcloud extension installed, and the database must be configured with the --with-perl option
 
+Running integration tests requires a database instance with the gpcloud extension installed, and the database must be configured with the `--with-perl` option:
 ```bash
 make integration
 ```
-To run end to end tests (requires a running GPDB instance), use
+
+To run end to end tests (requires a running GPDB instance), use:
 ```bash
 make end_to_end
 ```
 
 ## Migrating Data with cbcopy
 
-Before migrating data, you need to copy cbcopy_helper to the $GPHOME/bin directory on all nodes of both the source and target databases. Then you need to find a host that can connect to both the source database and the target database, and use the cbcopy command on that host to initiate the migration.By default, both metadata and data are migrated.
+Before migrating data, you need to copy cbcopy_helper to the `$GPHOME/bin` directory on all nodes of both the source and target databases. Then you need to find a host that can connect to both the source database and the target database, and use the cbcopy command on that host to initiate the migration. By default, both metadata and data are migrated.
 
 ### Database version requirements
 cbcopy relies on the "COPY ON SEGMENT" command of the database, so it has specific version requirements for the database.
@@ -98,43 +103,40 @@ cbcopy supports two data loading modes.
 - `--append` - Insert the migrated records into the table directly, regardless of the existing records.
 - `--truncate` - First, clear the existing records in the table, and then insert the migrated records into the table.
 
-
 ### Object dependencies
 
-If the tables you are migrating depend on certain global objects, you need to include the --with-globalmeta option (default: false) during the migration; otherwise, the creation of these tables in the target database will fail.
+If the tables you are migrating depend on certain global objects, you need to include the `--with-globalmeta` option (default: false) during the migration; otherwise, the creation of these tables in the target database will fail.
 
 ### Role
-If you want to change the table owner information during migration, which means you do not want to create the same role in the target database (disable the --with-globalmeta option), you need to first create the corresponding role in the target database. Then, use the --owner-mapping-file to specify the mapping between the source role and the target role; otherwise, the creation of tables in the target database will fail.
+If you want to change the table owner information during migration, which means you do not want to create the same role in the target database (disable the `--with-globalmeta` option), you need to first create the corresponding role in the target database. Then, use the `--owner-mapping-file` to specify the mapping between the source role and the target role; otherwise, the creation of tables in the target database will fail.
 
 ### Tablespace
-- `--tablespace` - We support migrating all source database objects into a single tablespace on the target database(Other modes besides the --full mode).if you need to migrate database objects from different schemas into different tablespaces, the best practice might be to migrate one schema at a time from the source database
+- `--tablespace` - We support migrating all source database objects into a single tablespace on the target database(Other modes besides the `--full` mode). If you need to migrate database objects from different schemas into different tablespaces, the best practice might be to migrate one schema at a time from the source database
 
 
 ### Parallel Jobs
 
 - `--copy-jobs` - The maximum number of tables that concurrently copies.
 
-
 ### Validate Migration
-During migration, we will compare the number of rows returned by COPY TO from the source database (i.e., the number of records coming out of the source database) with the number of rows returned by COPY FROM in the target database (i.e., the number of records loaded in the target database). If the two counts do not match, the migration of that table will fail.
+During migration, we will compare the number of rows returned by `COPY TO` from the source database (i.e., the number of records coming out of the source database) with the number of rows returned by `COPY FROM` in the target database (i.e., the number of records loaded in the target database). If the two counts do not match, the migration of that table will fail.
 
 ### Copy Strategies
 
 cbcopy internally supports three copy strategies for tables.
 
-- `Copy On Master` - If the table's statistics pg_class->reltuples is less than --on-segment-threshold, cbcopy will enable the Copy On Master strategy for this table, meaning that data migration between the source and target databases can only occur through the master node.
-
-- `Copy On Segment` - If the table's statistics pg_class->reltuples is greater than --on-segment-threshold, and both the source and target databases have the same version and the same number of nodes, cbcopy will enable the Copy On Segment strategy for this table. This means that data migration between the source and target databases will occur in parallel across all segment nodes without data redistribution.
-- `Copy on External Table` - For tables that do not meet the conditions for the above two strategies, cbcopy will enable the Copy On External Table strategy. This means that data migration between the source and target databases will occur in parallel across all segment nodes with data redistribution.
+- `Copy On Coordinator` - If the table's statistics `pg_class->reltuples` is less than `--on-segment-threshold`, cbcopy will enable the `Copy On Coordinator` strategy for this table, meaning that data migration between the source and target databases can only occur through the coordinator node.
+- `Copy On Segment` - If the table's statistics `pg_class->reltuples` is greater than `--on-segment-threshold`, and both the source and target databases have the same version and the same number of nodes, cbcopy will enable the `Copy On Segment` strategy for this table. This means that data migration between the source and target databases will occur in parallel across all segment nodes without data redistribution.
+- `Copy on External Table` - For tables that do not meet the conditions for the above two strategies, cbcopy will enable the `Copy On External Table` strategy. This means that data migration between the source and target databases will occur in parallel across all segment nodes with data redistribution.
 
 ### Result files
-After the cbcopy finishes running, it generates some files in the $USER/gpAdminLogs directory. The cbcopy_$timestamp.log file contains all the logs, including debugging and error messages. Additionally, there will be cbcopy_succeed_$timestamp and cbcopy_failed_$timestamp files, which contain the tables that were processed successfully and those that failed.
+After the cbcopy finishes running, it generates some files in the `$USER/gpAdminLogs` directory. The `cbcopy_$timestamp.log` file contains all the logs, including debugging and error messages. Additionally, there will be `cbcopy_succeed_$timestamp and cbcopy_failed_$timestamp` files, which contain the tables that were processed successfully and those that failed.
 
 ### Multiple migrations
-If, after migration, some tables migrate successfully while others fail, we can pass the cbcopy_succeed_$timestamp file to the --exclude-table-file option. This way, we can avoid re-migrating the tables that have already been successfully migrated.
+If, after migration, some tables migrate successfully while others fail, we can pass the `cbcopy_succeed_$timestamp` file to the `--exclude-table-file` option. This way, we can avoid re-migrating the tables that have already been successfully migrated.
 
 ### Statistics Used by the cbcopy
-When migrating in a production environment, a good strategy is to perform an analyze command on tables with a large amount of data in advance. cbcopy will use statistics of the table to decide whether to migrate only through the master or through all the segment nodes
+When migrating in a production environment, a good strategy is to perform an analyze command on tables with a large amount of data in advance. cbcopy will use statistics of the table to decide whether to migrate only through the coordinator or through all the segment nodes
 
 ## Examples
 ```
@@ -174,7 +176,7 @@ Flags:
       --ip-mapping-file string       ip mapping file (format, ip1:ip2)
       --metadata-jobs int            The maximum number of metadata restore tasks, valid values are between 1 and 64512 (default 2)
       --metadata-only                Only copy metadata, do not copy data
-      --on-segment-threshold int     Copy between masters directly, if the table has smaller or same number of rows (default 1000000)
+      --on-segment-threshold int     Copy between coordinators directly, if the table has smaller or same number of rows (default 1000000)
       --owner-mapping-file string    Object owner mapping file, The line format is "source_role_name,dest_role_name"
       --quiet                        Suppress non-warning, non-error log messages
       --schema strings               The schema(s) to be copied, separated by commas, in the format database.schema

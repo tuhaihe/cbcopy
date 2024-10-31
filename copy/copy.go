@@ -56,7 +56,7 @@ func SetFlagDefaults(flagSet *pflag.FlagSet) {
 	flagSet.Bool(options.DATA_ONLY, false, "Only copy data, do not copy metadata")
 	flagSet.Bool(options.WITH_GLOBALMETA, false, "Copy global meta objects (default: false)")
 	flagSet.Bool(options.COMPRESSION, false, "Transfer the compression data, instead of the plain data")
-	flagSet.Int(options.ON_SEGMENT_THRESHOLD, 1000000, "Copy between masters directly, if the table has smaller or same number of rows")
+	flagSet.Int(options.ON_SEGMENT_THRESHOLD, 1000000, "Copy between Coordinators directly, if the table has smaller or same number of rows")
 	flagSet.Bool(options.QUIET, false, "Suppress non-warning, non-error log messages")
 	flagSet.String(options.SOURCE_HOST, "127.0.0.1", "The host of source cluster")
 	flagSet.Int(options.SOURCE_PORT, 5432, "The port of source cluster")
